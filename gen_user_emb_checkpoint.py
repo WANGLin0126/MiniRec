@@ -1,4 +1,3 @@
-## 采用数据蒸馏的方法在 embedding 空间蒸馏数据，然后找距离蒸馏数据最近的用户作为新的训练子集
 
 import os
 # os.environ["CUDA_VISIBLE_DEVICES"] = "3"
@@ -75,7 +74,6 @@ class GenrateUserEmbeddings(RecPOTrainer):
         # train_dataset = self.train_dataset
 
         if is_multi_gpu:
-            # 多卡环境：使用DistributedSampler
             from torch.utils.data import DistributedSampler
             
             sampler = DistributedSampler(
@@ -92,11 +90,10 @@ class GenrateUserEmbeddings(RecPOTrainer):
                 pin_memory=self.args.dataloader_pin_memory,
                 persistent_workers=False,
                 prefetch_factor=self.args.dataloader_prefetch_factor,
-                sampler=sampler,  # 使用DistributedSampler
+                sampler=sampler,  
             )
         else:
-            # 单卡环境：使用普通的DataLoader
-            # 使用更安全的方法来获取数据集子集
+
 
             dataloader = torch.utils.data.DataLoader(
                 train_dataset,  # type: ignore
@@ -106,7 +103,7 @@ class GenrateUserEmbeddings(RecPOTrainer):
                 pin_memory=self.args.dataloader_pin_memory,
                 persistent_workers=False,
                 prefetch_factor=self.args.dataloader_prefetch_factor,
-                shuffle=False,  # 单卡环境使用shuffle=False
+                shuffle=False,  
             )
         
         # dataloader = self.accelerator.prepare(dataloader)
@@ -132,7 +129,7 @@ class GenrateUserEmbeddings(RecPOTrainer):
                 if use_reasoning:
                     batch_input = self._generate_in_train(eval_model, batch)
                     
-                    # 检查batch_input中的键名，使用正确的键
+                    
                     if 'multi_user_input_ids' in batch_input:
                         input_ids = batch_input['multi_user_input_ids']
                         attention_mask = batch_input['multi_user_attention_mask']
@@ -140,22 +137,22 @@ class GenrateUserEmbeddings(RecPOTrainer):
                         input_ids = batch_input['user_input_ids']
                         attention_mask = batch_input['user_attention_mask']
                     else:
-                        # 打印可用的键以便调试
+                      
                         print(f"Available keys in batch_input: {list(batch_input.keys())}")
                         raise KeyError("Neither 'multi_user_input_ids' nor 'user_input_ids' found in batch_input")
                 else:
                     input_ids       = batch['user_gen_input_ids']
                     attention_mask  = batch['user_gen_attention_mask']
                 
-                # 调用模型并处理返回值
+                
                 _, batch_emb = self.model(
                     input_ids, 
                     attention_mask,
-                    return_with_last_hidden_states=True  # 确保返回两个值
+                    return_with_last_hidden_states=True  
                 )
                 
                 
-                # 收集用户ID（用于后续对齐）
+                
                 all_user_ids.append(torch.tensor(batch_user_ids).to(input_ids.device))
                 all_seq_labels.append(batch_seq_labels) 
                 all_embeddings.append(batch_emb)
@@ -167,7 +164,7 @@ class GenrateUserEmbeddings(RecPOTrainer):
         del eval_model
         
         if is_multi_gpu:
-            # 多卡环境：收集所有GPU上的结果
+
             gathered_embeddings = self.accelerator.gather_for_metrics(all_embeddings)
             gathered_seq_labels = self.accelerator.gather_for_metrics(all_seq_labels)
             gathered_user_ids = self.accelerator.gather_for_metrics(all_user_ids)
@@ -177,15 +174,15 @@ class GenrateUserEmbeddings(RecPOTrainer):
             # print(f"gathered_user_ids: {gathered_user_ids}")
             # print('-'*100)
 
-            # 只在主进程上处理结果
+    
             if self.accelerator.is_main_process:
 
                 return gathered_embeddings, self.item_hs, gathered_seq_labels, gathered_user_ids
             else:
-                # 非主进程返回空结果
+ 
                 return torch.empty(0), torch.empty(0), [], []
         else:
-            # 单卡环境：直接处理结果
+
             return all_embeddings, self.item_hs, all_seq_labels, all_user_ids
 
 
@@ -227,7 +224,7 @@ def train(
         max_new_tokens=256,
         group_size=1,
         lr_scheduler_type='constant',
-        use_vllm=False,  # 暂时禁用vllm以避免分布式通信问题
+        use_vllm=False,  
         a=0,
         b=10,
         use_reasoning = True,
@@ -273,7 +270,6 @@ def train(
     accelerator = Accelerator()
     rich.print(accelerator.deepspeed_plugin)
 
-    # 设置NCCL超时时间，避免大数据集训练时的通信超时
 
     ################## set dataset ##################
 
@@ -447,10 +443,8 @@ if __name__ == "__main__":
 
     # CDs_and_Vinyl 10748 
     total_samples = 10748
-    n = 4  # 分四批次
+    n = 4  
     batch_size = total_samples // n  
-    # 将保存的所有结果合并
-    # 合并所有批次的结果
     use_reasoning = True
 
     # for i in range(n):
@@ -459,7 +453,7 @@ if __name__ == "__main__":
         print(f"Batch {i+1}: Begin: {i * batch_size}, End: {min(i * batch_size + batch_size, total_samples)}")
         print('*'*100)
         a = i * batch_size
-        b = min(a + batch_size, total_samples) if i < n - 1 else total_samples  # 最后一批处理剩余样本
+        b = min(a + batch_size, total_samples) if i < n - 1 else total_samples  
         print(f"Batch {i+1}: Begin: {a}, End: {b}")
         train(a=a, b=b, use_reasoning = use_reasoning)
 

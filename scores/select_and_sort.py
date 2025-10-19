@@ -160,9 +160,9 @@ def random_fold_sort_with_visual(
 # ======================================================
 def main():
     # 参数
-    select_k = 255
-    alpha = 10
-    n_folds = 1
+    select_k = 256
+    alpha = 1
+    n_folds = 4
 
     embs_file = "/storage_fast/lwang/SeqRecDistill/RRec/embs/selected/all_unique_embs.pt"
     scores_file = "/storage_fast/lwang/SeqRecDistill/RRec/scores/sample_scores.jsonl"

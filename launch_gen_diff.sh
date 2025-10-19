@@ -1,8 +1,6 @@
 #!/bin/bash
-# ================== 基础环境设置 ==================
 export TERM=xterm-256color
 export LANG=en_US.UTF-8
-# 设置 NCCL 调试环境变量
 export NCCL_DEBUG=INFO
 export NCCL_ASYNC_ERROR_HANDLING=1
 
@@ -15,7 +13,7 @@ export VLLM_USE_V1=0
 export VLLM_TENSOR_PARALLEL_SIZE=1
 export NCCL_P2P_LEVEL=NVL
 export NCCL_P2P_DISABLE=0
-export NCCL_IB_DISABLE=1   # 禁掉 InfiniBand，避免误选
+export NCCL_IB_DISABLE=1   
 
 
 
@@ -23,16 +21,14 @@ NUM_PROCESSES=4
 MAIN_PROCESS_PORT=20138
 
 
-# ================== 配置 ==================
-MODEL='gemma'   # 可选: 'qwen3b', 'qwen1.5b', 'gemma', 'deepseek'
 
-# DATASET_CAT='Musical_Instruments'
+MODEL='gemma'  
+
 DATASET_CAT='CDs_and_Vinyl'
 
 DATASET_DIR="data/${DATASET_CAT}_0_2022-10-2023-10"
 
-# ================== 运行多个任务 ==================
-for n in 27498; do
+for n in 10748; do
     RUN_NAME="difficulty-${n}-${MODEL}-${DATASET_CAT}"
     echo "🚀 正在运行 run_name=${RUN_NAME}..."
 

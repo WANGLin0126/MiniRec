@@ -75,18 +75,6 @@ def train(
         model_name = model_names["Qwen2.5-3B-Instruct"]
         from models.qwen_models import (Qwen2RRecCasualLM as ModelClass,
                                         Qwen2RRecConfig as ConfigClass)
-    elif model == 'qwen1.5b':
-        model_name = model_names["Qwen2.5-1.5B-Instruct"]
-        from models.qwen_models import (Qwen2RRecCasualLM as ModelClass,
-                                        Qwen2RRecConfig as ConfigClass)
-    elif model == 'qwen4b':
-        model_name = model_names["Qwen3-4B"]
-        from models.qwen_models import (Qwen2RRecCasualLM as ModelClass,
-                                        Qwen2RRecConfig as ConfigClass)
-    elif model == 'deepseek':
-        model_name = model_names["DeepSeek-R1-Distill-Qwen-1.5B"]
-        from models.qwen_models import (Qwen2RRecCasualLM as ModelClass,
-                                        Qwen2RRecConfig as ConfigClass)
     else:
         raise NotImplementedError
     output_dir = os.path.join(output_dir, run_name)
@@ -107,8 +95,6 @@ def train(
 
     dset = datasets.load_from_disk(dataset_dir)
     
-    # 加载 selected
-    # selected_inds = np.load(f"selected/{dataset_category}_selected_1024_inds.npy")
     
     if "128" in run_name:
         n = 128
@@ -118,64 +104,22 @@ def train(
         n = 512
     elif "1024" in run_name:
         n = 1024
-    elif "2048" in run_name:
-        n = 2048
-    elif "1023" in run_name:
-        n = 1023
     else:
         raise ValueError(f"Invalid n value in run_name: {run_name}")
         
-    # if 'random' in run_name:
-    #     selected_inds = random.sample(range(0, 10748), n)
-    # else:
-    #     if 'no-reasoning' in run_name:
-    #         print("*"*100)
-    #         print(f"selected_no_reasoning/{dataset_category}_selected_{n}_inds.npy")
-    #         selected_inds = np.load(f"selected_no_reasoning/{dataset_category}_selected_{n}_inds.npy")
-    #     elif 'checkpoint' in run_name:
-    #         selected_inds = np.load(f"selected_checkpoint/{dataset_category}_selected_{n}_inds.npy")
-    #         print("*"*100)
-    #         print(f"selected_checkpoint/{dataset_category}_selected_{n}_inds.npy")
-    #         print("*"*100)
-    #     else:
-    #         selected_inds = np.load(f"selected/{dataset_category}_selected_{n}_inds.npy")
-    #         print("*"*100)
-    #         print(f"selected/{dataset_category}_selected_{n}_inds.npy")
-    #         print("*"*100)s
-    if dataset_category == 'Musical_Instruments':
-        if 'random' in run_name:
-            path = f"/storage_fast/lwang/SeqRecDistill/RRec/Instruments/selected_inds/random_{n}.npy"
-            selected_inds = np.load(path)
-            print("="*100)
-            print(f"loded the selected_inds from {path}")
-            print("="*100)
-    else:
-        if 'random' in run_name:
-            if shuffle:
-                path = f"/storage_fast/lwang/SeqRecDistill/RRec/selected_inds/random/{n}_inds.npy"
-                selected_inds = np.load(path)
-            else:
-                path = f"/storage_fast/lwang/SeqRecDistill/RRec/selected_inds/random/{n}_sorted.npy"
-                selected_inds = np.load(path)
-            print("="*100)
-            print(f"loded the selected_inds from {path}")
-            print("="*100)
-            # selected_inds = random.sample(range(0, 10748), n)
-            # print(f"loded the selected_inds from random.sample(range(0, 10748), {n})")
-        else:
-            # /storage_fast/lwang/SeqRecDistill/RRec/scores/selected_indices_256.npy
-            path = f"./scores/sorted_{n}_fold_16.npy"
-            selected_inds = np.load(path)
-            print("="*100)
-            print(f"loded the selected_inds from {path}")
-            print("="*100)
+    if n == 1024:
+        fold = 16
+    elif n == 512:
+        fold = 8
+    elif n == 256:
+        fold = 4
+        
+    path = f"./scores/sorted_{n}_folf_{fold}.npy"
+    selected_inds = np.load(path)
+    print("="*100)
+    print(f"loded the selected_inds from {path}")
+    print("="*100)
     
-
-
-
-    # print("*"*100)
-    # print(len(np.unique(selected_inds)))
-    # print("*"*100)
     dset['train'] = dset['train'].select(selected_inds)
 
     tokenizer = get_tokenizer(model_name)

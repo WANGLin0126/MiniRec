@@ -20,12 +20,6 @@ from torch import distributed as dist
 
 class EvalRecPOTrainer(RecPOTrainer):
     def compute_rec_score(self, model, inputs, similarity=None, train_eval='eval'):
-        # 父类的实现是：
-        #   - 计算 similarity
-        #   - 求 ndcg, rewards
-        #   - 返回 {advantages, relabel_mask, ...}
-        #
-        # 这里 copy 一部分父类逻辑，保证拿到 ndcg / rewards
 
         if train_eval == 'train':
             num_samples = self.args.generation_config.num_return_sequences
@@ -62,7 +56,6 @@ class EvalRecPOTrainer(RecPOTrainer):
         rewards = (1 - self.args.reward_softmax_weight) * ndcg + \
                   self.args.reward_softmax_weight * sim_softmax
 
-        # ---- per-sample 信息 ----
         result = {
             'rewards_per_sample': rewards.detach().cpu().tolist(),
             'ndcg_per_sample': ndcg.detach().cpu().tolist(),
@@ -123,12 +116,10 @@ def evaluate(
     if accelerator.is_main_process:
         rich.print("Arguments: ", locals())
 
-    # 加载 dataset
+
     dset = datasets.load_from_disk(dataset_dir)
     
     all_inds = np.arange(10748)
-
-# 补集 = 全集 - selected_inds
     
 
     
@@ -136,26 +127,21 @@ def evaluate(
     
     
     selected_inds = np.arange(10748)
-    # 对应映射 selected_inds
+
     id_map = {i: int(selected_inds[i]) for i in range(len(selected_inds))}
 
-    # 给每个样本加上 sample_id
+
     def add_sample_id(example, idx):
         return {"sample_id": str(id_map[idx])}
 
     dset['train'] = dset['train'].map(add_sample_id, with_indices=True)
 
-
-    # # 简单选取，全量/部分都可以
     path = f"/storage_fast/lwang/SeqRecDistill/RRec/train_diff/remian_inds.npy"
-    # 把下面的从 路径加载，改为 直接用numpy 生成 0 到 10748 的数
     remain_inds = np.load(path)
-    # remaining_inds = np.setdiff1d(all_inds, remain_inds)
     dset['train'] = dset['train'].select(remain_inds)
 
     print(dset['train'][4])
     print(dset['train'][50])
-    # print(dset['train'][1000])
 
     tokenizer = get_tokenizer(model_name)
     emb_token, emb_end_token = '<answer>', '</answer>'
@@ -165,7 +151,7 @@ def evaluate(
     config.pad_token_id = tokenizer.pad_token_id
     tokenizer.save_pretrained(output_dir)
 
-    # 加载模型
+    
     base_model = ModelClass.from_pretrained(
         model_name,
         torch_dtype=torch.float16,
@@ -191,8 +177,6 @@ def evaluate(
             print("="*100)
 
 
-    # 构造 trainer（不用 train）
-    # 在 RecPOTrainingArguments 中添加缺失的参数
     training_args = RecPOTrainingArguments(
         seed=seed,
 
@@ -261,7 +245,6 @@ def evaluate(
 
 
 
-    # ==== 检测是否多卡 ====
     is_distributed = torch.distributed.is_initialized() and accelerator.num_processes > 1
     rank = accelerator.process_index
     world_size = accelerator.num_processes
@@ -288,7 +271,6 @@ def evaluate(
     print(f"len(dataloader) : {len(dataloader)}")
     print("="*100)
 
-    # ==== 文件名：单卡直接写，多卡写 rank 子文件 ====
     if is_distributed:
         rank_file = f"{output_file}.rank{rank}"
     else:
@@ -326,18 +308,16 @@ def evaluate(
                 print(f"[Eval][rank {rank}] processed {step} batches")
 
     if is_distributed:
-        dist.barrier()   # 等待所有进程就绪
-    # ==== 主进程合并 ====
+        dist.barrier()   
     if is_distributed and accelerator.is_main_process:
         with open(output_file, "w", encoding="utf-8") as fout:
             for rf in sorted(glob.glob(f"{output_file}.rank*")):
                 with open(rf, "r", encoding="utf-8") as fin:
                     for line in fin:
                         fout.write(line)
-                os.remove(rf)  # 删除临时文件
+                os.remove(rf)  
         print(f"[Eval] merged {world_size} rank files into {output_file}")
 
-    # ==== 清理进程组 ====
     if torch.distributed.is_initialized():
         torch.distributed.destroy_process_group()
 

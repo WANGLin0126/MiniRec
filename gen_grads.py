@@ -25,18 +25,9 @@ from trainers.RecPOTrainer import RecPOTrainer, RecPOTrainingArguments
 
 
 class CombinedTrainer(RecPOTrainer):
-    """同时生成 一阶梯度 与 二阶梯度"""
 
     def compute_gradients_info(self, dataloader, model, prefix="multi_user"):
-        """
-        计算 batch 内最后一个有效 token embedding 的一阶梯度和
-        在梯度方向上的 Hessian-Vector Product (HVP).
 
-        Returns:
-            grad_1st_list: [B, hidden_dim] 一阶梯度
-            hvp_list: [B, hidden_dim] HVP (沿梯度方向)
-            user_ids_list: [B]
-        """
         grad_1st_list = []
         hvp_list = []
         user_ids_list = []
@@ -50,17 +41,16 @@ class CombinedTrainer(RecPOTrainer):
             batch |= self.compute_rec_score(model, batch)
             user_ids = batch["train_data_id"]
 
-            # 前向
+
             loss = self.batch_forward(model, batch, prefix=prefix)
             last_hs = self.last_token_hidden_states
             last_hs.retain_grad()
 
-            # 一阶梯度 g
             grad_1st = torch.autograd.grad(
                 loss, last_hs, create_graph=True
             )[0]  # (B, hidden_dim)
 
-            # 用 g 自己作为方向 v
+
             v = grad_1st
 
             # Hessian-Vector Product: Hv = H @ v
@@ -119,16 +109,6 @@ def run_once(
     else:
         raise NotImplementedError
 
-    # === 数据 ===
-    # dset = datasets.load_from_disk(dataset_dir)
-    # if use_selected_inds:
-    #     path = f"/storage_fast/lwang/SeqRecDistill/RRec/selected_inds/random/{n_train}_inds.npy"
-    #     selected_inds = np.load(path)
-    #     dset["train"] = dset["train"].select(selected_inds)
-    #     id_map = {i: int(selected_inds[i]) for i in range(len(selected_inds))}
-    #     def add_sample_id(example, idx):
-    #         return {"sample_id": str(id_map[idx])}
-    # else:
 
 
     tokenizer = get_tokenizer(model_name)
@@ -168,11 +148,7 @@ def run_once(
         emb_end_token=emb_end_token,
         use_vllm=use_vllm,
     )
-    # print("="*100)
-    # print(dset["train"][0].keys())
-    # print(dset["test"][0].keys())
-    # print(dset["valid"][0].keys())
-    # print("="*100)
+
     trainer = CombinedTrainer(
         model=base_model,
         compute_metrics=get_compute_metrics(MetricUpdater(ks=[5, 10, 20, 50])),
@@ -226,7 +202,7 @@ def main(
     max_new_tokens=256,
     group_size=1,
     use_lora=True,
-    checkpoint_path="/storage_fast/lwang/SeqRecDistill/RRec/checkpoints/checkpoint-256-gemma-CDs_and_Vinyl-1/checkpoint-28",
+    checkpoint_path="/path/to/your/checkpoint",
     use_reasoning=True,
     use_vllm=False,
 ):
